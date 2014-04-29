@@ -1,0 +1,215 @@
+\documentclass[a4paper,12pt]{article}
+
+% ------------ Load packages -------------
+\usepackage{graphicx}
+\graphicspath{{fig/}{fig/pdf/}{eps/}{./}}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{verbatim}
+\usepackage{url}
+\usepackage[colorlinks,citecolor=blue]{hyperref}
+\usepackage{booktabs}%for nice tabs
+\usepackage[small,bf]{caption} %for little font caption
+\usepackage[utf8]{inputenc}
+\usepackage[english,french]{babel}
+\usepackage{arydshln}
+\usepackage{natbib} % for Bibtek
+\bibliographystyle{agu}
+\newcommand{\checkthis}[1] {{\textcolor{magenta}{#1}}}
+
+
+\title{Fully implicit, finite-differences resolution of variably saturated flow in 1D  with Python.}
+
+\author{}
+
+\begin{document}
+
+\maketitle
+
+\section{Soil hydraulic properties}
+
+In unsaturated conditions, water content $\theta$ can be expressed with the closed-form equation provided by \cite{Genuchten1980} :
+\begin{equation}
+    \theta(h) =  \theta_r + (\theta_s - \theta_r) \left( 1+ |\alpha h|^n \right)^{-m}
+    \label{eq:genuchten_theta}
+\end{equation}
+where $\theta_r$, $\theta_s$, $\alpha$ and $n$ are soil characteristics and $m = 1- 1/n$. $h$ [L] is pressure head,counted as negative in unsaturated conditions. For any $h>0$, $\theta(h) = \theta_s$.
+
+The derivative of Eq. \ref{eq:genuchten_theta} with respect to $h$ reads: 
+\begin{equation}
+    \frac{d\theta}{dh}(h) = m n \alpha^n h^{n-1} 
+       (\theta_s - \theta_r) \left( 1+ |\alpha h|^n \right)^{-m-1}
+    \label{eq:dtheta_dh}
+\end{equation}
+Though apparently different, this expression is equivalent to Eq. 23 in \cite{Genuchten1980}. The derivative was somewhat difficult to obtain with the $|h|$.
+
+Following \citep{Genuchten1980}, the relative permeability $K_r$ is expressed as follows \citep{Genuchten1980}:
+
+
+\begin{equation}
+    K_r(h) = { { \left( 1-|\alpha h|^{n-1} (1+|\alpha h|^n)^{-m} \right)^2 } \over
+		{ (1+ |\alpha h|^{m/2} ) } }
+    \label{eq:K_r}
+\end{equation}
+
+
+\section{Model implementation}
+
+We consider the mixed-form equation for variably saturated flow proposed by \citep{Celiaetal1990} and modified by \cite{Clementetal1994}:
+\begin{equation}
+    S_s \frac{\theta}{\eta} \frac{\partial h}{\partial t} + \frac{\partial \theta}{\partial t} = 
+    \frac{\partial}{\partial z} \left(-K(\theta) \frac{\partial H}{\partial z} \right) + q
+    \label{eq:mixed_unsat}
+\end{equation}
+where $S_s$ $\mathrm{[L^{-1}]}$ is the specific storage, $H$ [L] is the hydraulic head, $\theta$ [-] is the water content, $\eta$ [-] is the porosity, $K$ $\mathrm{[LT^{-1}]}$ is the hydraulic conductivity and $q$ $\mathrm{[T^{-1}]}$ the source term. Contrary to the original Richards' equation, Eq. \ref{eq:mixed_unsat} accounts for the effect of specific storage, which makes it valid for transient saturated flow.
+
+The hydraulic head is defined by $H = h + z$, where $h$ is the pressure head and $z$ the coordinate along the (Oz) vertical upward axis. Eq. \ref{eq:mixed_unsat} yields: 
+
+\begin{equation}
+    S_s \frac{\theta}{\eta} \frac{\partial h}{\partial t} + \frac{\partial \theta}{\partial t} =
+	 \frac{\partial}{\partial z} \left( K \frac{\partial h}{\partial z} \right) + \frac{\partial K}{\partial z}
+    \label{eq:mixed_unsat2}
+\end{equation}
+
+Spatial derivation is obtained with a central differences scheme as follows : 
+
+\begin{align}
+      \frac{\partial}{\partial z} \left( K \frac{\partial h}{\partial z} \right) + \frac{\partial K}{\partial z} & \approx  \frac{1}{dz} \left\{ \left(\frac{K_i^{n+1,m}+K_{i+1}^{n+1,m}}{2}\right) \left(\frac{h_{i+1}^{n+1,m+1} - h_i^{n+1,m+1}}{dz} \right) \right. \nonumber \\
+      &  - \left. \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2}\right) \left(\frac{h_{i}^{n+1,m+1} - h_{i-1}^{n+1,m+1}}{dz} \right)  \right\} \nonumber  \\
+      & + \frac{1}{dz} \left( \left(\frac{K_i^{n+1,m}-K_{i+1}^{n+1,m}}{2}\right) - \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2}  \right) \right)  
+    \label{eq:space_discret}
+\end{align}
+where $n$ denotes the $n$th discrete time level, when the solution is known, $dt$ is the time step, $K_i$ is the value of hydraulic conductivity at the $i$th node and $h_i$ the value of pressure head at the $i$th node. The current and previous Picard iteration are denoted as $m+1$ and $m$, respectively.
+
+A backward finite-difference expression is used for temporal derivative : 
+\begin{equation}
+    S_s \frac{\theta}{\eta} \frac{\partial h}{\partial t} \approx \frac{S_s}{\eta}\theta_i^{n+1,m} \left( { h_i^{n+1,m+1} - h_i^n \over dt} \right)
+    \label{eq:dh_temp_deriv}
+\end{equation}
+
+After \cite{Celiaetal1990} and \cite{Clementetal1994}, time derivative of water content is approximated as follows:
+
+\begin{equation}
+    \frac{\partial \theta}{\partial t} \approx \left( {\theta_i^{n+1,m} - \theta_i^n \over dt} \right) + C_i^{n+1,m} \left( {h_i^{n+1,m+1}-h_i^{n+1,m} \over dt} \right)
+    \label{eq:theta_temp_deriv}
+\end{equation}
+where $C$ is the derivative of the water content with respect to the pressure head (Eq. \ref{eq:dtheta_dh})
+
+Eqs. \ref{eq:space_discret}, \ref{eq:dh_temp_deriv} and \ref{eq:theta_temp_deriv} can be re-arranged to form a system of linear algebraic equations :
+
+\begin{equation}
+    m_1 h_{i-1}^{n+1,m+1} + m_2 h_i^{n+1,m+1} + m_3 h_{i+1}^{n+1,m+1} = b_1 h_i^{n+1,m} + b_2 h_i^n + b_3 + b_4
+    \label{eq:lin_system}
+\end{equation}
+with:
+\begin{align}
+    m_1 & = \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2dz^2}\right)  \\
+    m_3 & = \left(\frac{K_i^{n+1,m}+K_{i+1}^{n+1,m}}{2dz^2}\right)  \\
+    b_1 & = \frac{C_i^{n+1,m}}{dt} \\
+    b_2 & = \frac{S_s\theta_i^{n+1,m}}{\eta dt} \\
+    b_3 & = \left(\frac{K_{i-1}^{n+1,m}+K_{i+1}^{n+1,m}}{2dz}\right) \\
+    b_4 & = \left( { \theta_i^{n+1,m} - \theta^n \over dt} \right) \\
+    m_2 & = - ( m_1 + m_3 + b_1 + b_2)
+    \label{eq:coefficients}
+\end{align}
+
+The following system should then be solved iteratively : 
+
+\begin{equation}
+    \mathbf{M}^{n+1,m} \mathbf{h}^{n+1,m+1} = \mathbf{B}^{n+1,m}
+    \label{eq:mat_system}
+\end{equation}
+where $\mathbf{M}$ is a sparse matrix containing in its central diagonals the coefficients $m_1$,$m_2$,$m_3$ and vector $\mathbf{B}$ gather the second member of Eq. \ref{eq:lin_system}. 
+
+
+The resolution of the system is obtained with the Python \texttt{scipy.sparse.spsolve} or \texttt{scipy.sparse.cg}  function, or \texttt{numpy.linalg.solve}.
+This remains an issue\dots
+
+\section{Boundary conditions}
+
+We consider a soil column subject to infiltration at the top. The boundary condition at the bottom is either a fixed-head or free drainage.
+
+\subsection{Fixed pressure head}
+
+For a fixed pressure head boundary condition at the \textbf{bottom} of the column, the boundary condition is expressed as follows :
+
+\begin{equation}
+    h_1^{n+1,m} = h_{bot}^{n+1}
+    \label{eq:bc_fixed_bot}
+\end{equation}
+where $h_{bot}$ is the value of the imposed pressure head at $t = t_{n+1}$. On the left side of Eq. \ref{eq:lin_system}, we have $m_1 = m_3 = 0$ and $m_2$=1. The right side of Eq. \ref{eq:lin_system} is $h_{bot}^{n+1}$.
+
+Similarly, for a fixed pressure head boundary condition at the \textbf{top} of the column, the boundary condition is expressed as follows :
+
+\begin{equation}
+    h_I^{n+1,m} = h_{top}^{n+1}
+    \label{eq:bc_fixed_top}
+\end{equation}
+where $h_{top}$ is the value of the imposed pressure head at $t = t_{n+1}$. On the left side of Eq. \ref{eq:lin_system}, we have $m_1 = m_3 = 0$ and $m_2$=1. The right side of Eq. \ref{eq:lin_system} is $h_{top}^{n+1}$.
+
+
+\subsection{Fixed flow}
+
+With a flux $q_z$ $\mathrm{[LT^{-1}]}$ imposed to one of the boundaries of the soil column, Darcy law yields: 
+\begin{align}
+    q_z = -K \frac{\partial H}{\partial z} &\iff q_z= -K \left( \frac{\partial h}{\partial z} + 1 \right) \nonumber \\
+					   &\iff \frac{\partial h}{\partial z} = - \frac{q_z}{K} - 1 
+    \label{eq:bc_qz}
+\end{align}
+
+If the flux $q_{top}$ is imposed to the \textbf{bottom} of the column, Eq. \ref{eq:bc_qz} yields:
+
+\begin{equation}
+     h_0 = h_1  + \frac{q_{bot}}{K_1} + 1
+    \label{eq:bc_qz_bot}
+\end{equation}
+where $h_{0}$ is pressure head at a virtual node out of the system. Inserting Eq. \ref{eq:bc_qz_bot} into Eq. \ref{eq:lin_system} yields: 
+\begin{equation}
+    (m_1 + m_2) h_1^{n+1,m+1} + m_3 h_{2}^{n+1,m+1} = b_1 h_1^{n+1,m} + b_2 h_1^n + b_3 + b_4 + m_3 dz \left( \frac{q_{bot}}{K_1} +1 \right)
+    \label{eq:bc_qz_lin_system_bot}
+\end{equation}
+
+In turn, if the flux $q_{top}$ is imposed to the \textbf{top} of the column, Eq. \ref{eq:bc_qz} yields:
+
+\begin{equation}
+    h_{I+1}  = h_I  - \frac{q_{top}}{K_I} - 1
+    \label{eq:bc_qz_top}
+\end{equation}
+
+where $I$ is the total number of nodes and $h_{I+1}$ is a virtual node out of the system. Inserting Eq. \ref{eq:bc_qz_top} into Eq. \ref{eq:lin_system} yields: 
+\begin{equation}
+    m_1 h_{I-1}^{n+1,m+1} + (m_2 + m_3) h_I^{n+1,m+1} = b_1 h_I^{n+1,m} + b_2 h_I^n + b_3 + b_4 + m_3 dz \left( \frac{q_{top}}{K_I} +1 \right)
+    \label{eq:bc_qz_lin_system_top}
+\end{equation}
+Note that infiltration into the soil column is simulated with a negative $q_{top}$.
+
+
+No flow boundary condition is a special case of the fixed flow boundary condition with $q_z = 0$.
+
+
+\subsection{Free drainage at the bottom of the column}
+
+Free drainage is expressed with a unit vertical hydraulic head gradient: 
+
+\begin{align}
+    \frac{\partial H}{\partial z} = 1 &\iff \frac{\partial}{\partial z} \left( z + h \right) =1 \nonumber \\
+				      &\iff \frac{\partial h}{\partial z} = 0 \nonumber \\
+				      &\iff {\left( h_1 - h_0 \right) \over dz}  = 0 \nonumber \\
+				      &\iff h_0 = h_1 
+    \label{eq:bc_drain}
+\end{align}
+
+Where $h_0$ is pressure head at a virtual node out of the system. In these conditions, Eq. \ref{eq:lin_system} becomes:
+
+\begin{equation}
+    (m_1 + m_2) h_1^{n+1,m+1} + m_3 h_2^{n+1,m+1} = b_1 h_1^{n+1,m} + b_2 h_1^n + b_3 + b_4
+    \label{eq:bc_drain_sys}
+\end{equation}
+
+\bibliography{biblio}
+
+\end{document}
+
