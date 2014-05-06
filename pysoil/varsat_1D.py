@@ -222,6 +222,8 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
     I = int(round(L/dz)) # number of cells
     z = np.linspace(0,L,I) # z coordinates of nodes
     # check h_init
+    if hasattr(h_init,"__len__") == False: #  constant and homogeneous q
+	h_init  = np.array(  [h_init] * I  )
     if len(h_init) != I:
 	print('ERROR: check dimension of h_init')
 	return(0,0,0)
