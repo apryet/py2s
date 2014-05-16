@@ -248,7 +248,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n):
    # free drainage at the bottom
     if bc['bot'][0] == 'free_drainage':
         M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m3(0,Kp)
+        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
         B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
         + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0]/dz
      
