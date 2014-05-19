@@ -172,11 +172,12 @@ def get_b2(i,theta,soil_carac):
 # coefficient b3 (g in Clement et al., 1994)
 # coefficient b3 (g in Clement et al., 1994)
 def get_b3(i,K):
-    if i!=0:
-        return( -( K[i+1]-K[i-1] ) / (2.*dz) )
-    else: 
-        return( -( K[i+1]-K[i] ) / (2.*dz) )
-
+    if i == 0 : 
+	#return( 0 )
+        #return( -( K[i+1]-K[i] ) / (2.*dz) )
+	return( -( K[i+2]-K[i] ) / (2.*dz) )
+    else :     
+	return( -( K[i+1]-K[i-1] ) / (2.*dz) )
 
 
 # coefficient b4 (h in Clement et al., 1994)
@@ -275,7 +276,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
 
 
 # model
-def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV = 1e-5, Runoff='True'):
+def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 1000, CRIT_CONV = 1e-5, Runoff='True'):
     # L : column length
     # T : simulation duration
     # dz : vertical discretization
@@ -293,8 +294,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
     # init vars
     if hasattr(dts,"__len__") == False:
         dts  = np.array( [dts] * int(round(T/dts)) )
-    t = np.cumsum(dts) # time array
-    #add t(0) to the vector t
+    t = np.hstack((0,np.cumsum(dts))) # time array
     N = len(dts) # number of time steps
     I = int(round(L/dz)) # number of cells
     z = np.linspace(0,L,I) # z coordinates of nodes
@@ -326,7 +326,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
     h = h0 = h_init 
     h_list = []
     # iterate over time
-    for n in range(0,N):
+    for n in range(1,N):
         dt = dts[n]
         theta0 = get_theta(h0,soil_carac)
         # Picard iteration 
@@ -334,10 +334,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
         for m in range(PICmax):
             M , B = build_system(h0, h, theta0 , bc, q, soil_carac, n, bcff='False')
             # solver linear system
-            #h1 =np.linalg.solve(M, B)[:,0]
-            #h1 = np.transpose(np.matrix(spsolve(csr_matrix(M),B)))
             h1 = np.transpose(np.matrix(cgs(csr_matrix(M),B)[0]))
-            #h1 = np.transpose(np.matrix(cg(csr_matrix(M),B)[0]))
             if np.max(h1-h) < CRIT_CONV:
                 if Runoff=='True':
                     if h1[I-1]> 0 :
@@ -346,10 +343,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
                         for mm in range (PICmax):
                             M , B = build_system(h0, h, theta0 , bc, q, soil_carac, n,bcff='True')
                             # solver linear system
-                            #h1 =np.linalg.solve(M, B)[:,0]
-                            #h1 = np.transpose(np.matrix(spsolve(csr_matrix(M),B)))
-                            #h1 = np.transpose(np.matrix(cgs(csr_matrix(M),B)[0]))
-                            h1 = np.transpose(np.matrix(cg(csr_matrix(M),B)[0]))
+                            h1 = np.transpose(np.matrix(cg(csr_matrix(M),B)[0])) # see also cgs, csr, spsolve
                             if np.max(h1-h) < CRIT_CONV:   
                                 print( 'Runoff Modification PIC iteration ='+str(mm))
                                 theta = get_theta(h,soil_carac)
