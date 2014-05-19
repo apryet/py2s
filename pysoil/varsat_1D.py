@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun May 18 12:34:17 2014
+
+@author: redhotkenny
+"""
+
 # --------------------------------------------------------------
 # -- Load modules
 import numpy as np
@@ -38,7 +45,7 @@ def C_curve(h,soil_carac):
     alpha = soil_carac['alpha']
     m = 1 - 1./n
     if h < 0 : 
-        return(  m * n * alpha**n * abs(h)**(n-1) * (theta_s-theta_r) * (1 + abs(alpha*h)**n)**(-m-1)   )
+        return(  m * n * alpha**n * abs(h) **(n-1) * (theta_s-theta_r) * (1 + abs(alpha*h)**n)**(-m-1)   )
     else :
         return(0)
 
@@ -52,7 +59,7 @@ def Kr_curve(h,soil_carac):
     m = 1 - 1./n
     if h < 0 : 
         return( ( 1 - abs(alpha*h)**(n-1)*(1+abs(alpha*h)**n)**(-m) )**2 / 
-        ( 1 + abs(alpha*h)**n  )**(m/2))
+        (( 1 + abs(alpha*h)**n  )**(0.5*m)) )
     else : 
         return(1)
 
@@ -163,8 +170,14 @@ def get_b2(i,theta,soil_carac):
     return( (Ss*theta[i]) / (eta*dt) )
 
 # coefficient b3 (g in Clement et al., 1994)
+# coefficient b3 (g in Clement et al., 1994)
 def get_b3(i,K):
-    return( -( K[i+1]-K[i-1] ) / (2.*dz) )
+    if i!=0:
+        return( -( K[i+1]-K[i-1] ) / (2.*dz) )
+    else: 
+        return( -( K[i+1]-K[i] ) / (2.*dz) )
+
+
 
 # coefficient b4 (h in Clement et al., 1994)
 def get_b4(i,theta0,theta):
@@ -188,7 +201,7 @@ def w_uptake(theta0, RD, q, soil_carac):  #from Feddes et al., 1978
 
 
 # build system of equation
-def build_system(h0,h,theta0, bc, q, soil_carac, n):
+def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
     # init vectors
     theta = get_theta(h,soil_carac)
     C     = get_C(h,soil_carac)
@@ -219,10 +232,15 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n):
     # fixed flow
     # top
     if bc['top'][0] == 'fixed_flow':
-            M[-1,-2] = get_m1(I-1,Kp)
-            M[-1,-1] = get_m2(I-1,Kp,C,theta) + get_m3(I-1,Kp)
-            B[-1] = - get_b1(I-1,C)*h[-1] - get_b2(I-1,theta,soil_carac)*h0[-1] \
-            + get_b3(I-2,K) + get_b4(I-1,theta0,theta) + WU[I-1] + get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
+            if bcff=='True':
+                M[-1,-1] = 1. 
+                M[-1,-2] = 0.  
+                B[-1]   = 0.
+            else:
+                M[-1,-2] = get_m1(I-1,Kp)
+                M[-1,-1] = get_m2(I-1,Kp,C,theta) + get_m3(I-1,Kp)
+                B[-1] = - get_b1(I-1,C)*h[-1] - get_b2(I-1,theta,soil_carac)*h0[-1] \
+                + get_b3(I-2,K) + get_b4(I-1,theta0,theta) + dz*WU[I-1] + get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
         #change get_m1(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1) by get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
         # bot
         #if bc['bot'][0] == 'fixed_flow':
@@ -235,7 +253,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n):
         M[0,1] = get_m3(0,Kp)
         M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
         B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0] + get_m3(0,Kp)*dz*(bc['top'][1][n]/Kp[0] +1)
+        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0] - get_m1(0,Kp)*dz*(bc['bot'][1][n]/Kp[0] +1)
         #Change the values... get_b3 not sure what will result
 
     # free drainage at the bottom
@@ -248,64 +266,16 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n):
    # free drainage at the bottom
     if bc['bot'][0] == 'free_drainage':
         M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
+        M[0,0] = get_m2(0,Kp,C,theta) + get_m3(0,Kp)
         B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
         + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0]
      
     # return M and B
     return(np.mat(M), np.transpose(np.mat(B)) )
 
-# build system of equation for Runoff Modification
-def build_system2(h0,h,theta0, bc, q, soil_carac, n):
-    # init vectors
-    theta = get_theta(h,soil_carac)
-    C     = get_C(h,soil_carac)
-    K     = get_K(h,soil_carac)
-    Kp    = get_Kp(K)
-    WU    = w_uptake(theta0, RD, q, soil_carac)
-    M     = np.zeros((h.size,h.size))
-    B     = np.zeros((h.size,))
-    # fill matrix M and forcing vector B
-    for i in range(1,I-1):
-       M[i,i-1] = get_m1(i,Kp)
-       M[i,i]   = get_m2(i,Kp,C,theta)
-       M[i,i+1] = get_m3(i,Kp)
-       B[i] = - get_b1(i,C)*h[i] - get_b2(i,theta,soil_carac)*h0[i] \
-        + get_b3(i,K) + get_b4(i,theta0,theta) + WU[i]
-    # set boundary conditions
-    #fixed flow changed by fixed head
-    # top
-    if bc['top'][0] == 'fixed_flow':
-        M[-1,-1] = 1. 
-        M[-1,-2] = 0.  
-        B[-1]   = 0.
-    # bot
-    # fixed head
-    if bc['bot'][0] == 'fixed_head':
-       M[0,0] = 1. 
-       M[0,1] = 0.  
-       B[0]   = bc['bot'][1][n]
-    
-    #fixed flow
-    if bc['bot'][0] == 'fixed_flow':
-        M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
-        B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0] + get_m3(0,Kp)*dz*(bc['top'][1][n]/Kp[0] +1)
-    
-   # free drainage at the bottom
-    if bc['bot'][0] == 'free_drainage':
-        M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
-        B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0]
-
-    #return M and B    
-    return(np.mat(M), np.transpose(np.mat(B)) )
-
 
 # model
-def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV = 1e-3, Runoff='True'):
+def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV = 1e-5, Runoff='True'):
     # L : column length
     # T : simulation duration
     # dz : vertical discretization
@@ -329,8 +299,6 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
     I = int(round(L/dz)) # number of cells
     z = np.linspace(0,L,I) # z coordinates of nodes
     # check h_init
-    if hasattr(h_init,"__len__") == False: #  constant and homogeneous q
-	h_init  = np.array(  [h_init] * I  )
     if len(h_init) != I:
         print('ERROR: check dimension of h_init')
         return(0,0,0)
@@ -348,7 +316,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
     #initialize Runoff and Infiltration
     RO = np.zeros((N))
     INF = bc['top'][1]
-
+    
     # -- run initization
     # initialize output matrices
     S=np.mat(np.zeros(shape=(I,N+1))) 
@@ -364,7 +332,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
         # Picard iteration 
         h00=h
         for m in range(PICmax):
-            M , B = build_system(h0, h, theta0 , bc, q, soil_carac, n)
+            M , B = build_system(h0, h, theta0 , bc, q, soil_carac, n, bcff='False')
             # solver linear system
             #h1 =np.linalg.solve(M, B)[:,0]
             #h1 = np.transpose(np.matrix(spsolve(csr_matrix(M),B)))
@@ -376,12 +344,12 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 500, CRIT_CONV
                         #Include the Runoff Modification
                         h=h00
                         for mm in range (PICmax):
-                            M , B = build_system2(h0, h, theta0 , bc, q, soil_carac, n)
+                            M , B = build_system(h0, h, theta0 , bc, q, soil_carac, n,bcff='True')
                             # solver linear system
                             #h1 =np.linalg.solve(M, B)[:,0]
                             #h1 = np.transpose(np.matrix(spsolve(csr_matrix(M),B)))
-                            h1 = np.transpose(np.matrix(cgs(csr_matrix(M),B)[0]))
-                            #h1 = np.transpose(np.matrix(cg(csr_matrix(M),B)[0]))
+                            #h1 = np.transpose(np.matrix(cgs(csr_matrix(M),B)[0]))
+                            h1 = np.transpose(np.matrix(cg(csr_matrix(M),B)[0]))
                             if np.max(h1-h) < CRIT_CONV:   
                                 print( 'Runoff Modification PIC iteration ='+str(mm))
                                 theta = get_theta(h,soil_carac)
