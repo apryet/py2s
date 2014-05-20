@@ -171,13 +171,14 @@ def get_b2(i,theta,soil_carac):
 
 # coefficient b3 (g in Clement et al., 1994)
 # coefficient b3 (g in Clement et al., 1994)
-def get_b3(i,K):
-    if i == 0 : 
-	#return( 0 )
+def get_b3(i,Kp):
+    #if i == 0 : 
+	return(-(Kp[i+1]-Kp[i])/dz)
+    #return( 0 )
         #return( -( K[i+1]-K[i] ) / (2.*dz) )
-	return( -( K[i+2]-K[i] ) / (2.*dz) )
-    else :     
-	return( -( K[i+1]-K[i-1] ) / (2.*dz) )
+	#return( -( K[i+2]-K[i] ) / (2.*dz) )
+    #else :     
+	#return( -( K[i+1]-K[i-1] ) / (2.*dz) )
 
 
 # coefficient b4 (h in Clement et al., 1994)
@@ -217,7 +218,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
        M[i,i]   = get_m2(i,Kp,C,theta)
        M[i,i+1] = get_m3(i,Kp)
        B[i] = - get_b1(i,C)*h[i] - get_b2(i,theta,soil_carac)*h0[i] \
-        + get_b3(i,K) + get_b4(i,theta0,theta) + WU[i]
+        + get_b3(i,Kp) + get_b4(i,theta0,theta) + WU[i]
     # set boundary conditions
     # fixed head
     # top
@@ -241,7 +242,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
                 M[-1,-2] = get_m1(I-1,Kp)
                 M[-1,-1] = get_m2(I-1,Kp,C,theta) + get_m3(I-1,Kp)
                 B[-1] = - get_b1(I-1,C)*h[-1] - get_b2(I-1,theta,soil_carac)*h0[-1] \
-                + get_b3(I-2,K) + get_b4(I-1,theta0,theta) + dz*WU[I-1] + get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
+                + get_b3(I-2,Kp) + get_b4(I-1,theta0,theta) + dz*WU[I-1] + get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
         #change get_m1(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1) by get_m3(I-1,Kp)*dz*(bc['top'][1][n]/Kp[-1] +1)
         # bot
         #if bc['bot'][0] == 'fixed_flow':
@@ -254,7 +255,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
         M[0,1] = get_m3(0,Kp)
         M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
         B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0] - get_m1(0,Kp)*dz*(bc['bot'][1][n]/Kp[0] +1)
+        + get_b3(0,Kp) + get_b4(0,theta0,theta) + WU[0] - get_m1(0,Kp)*dz*(bc['bot'][1][n]/Kp[0] +1)
         #Change the values... get_b3 not sure what will result
 
     # free drainage at the bottom
@@ -267,9 +268,9 @@ def build_system(h0,h,theta0, bc, q, soil_carac, n, bcff):
    # free drainage at the bottom
     if bc['bot'][0] == 'free_drainage':
         M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m3(0,Kp)
+        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
         B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + get_b3(0,K) + get_b4(0,theta0,theta) + WU[0]
+        + get_b3(0,Kp) + get_b4(0,theta0,theta) + WU[0]
      
     # return M and B
     return(np.mat(M), np.transpose(np.mat(B)) )
@@ -326,7 +327,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 1000, CRIT_CON
     h = h0 = h_init 
     h_list = []
     # iterate over time
-    for n in range(1,N):
+    for n in range(0,N):
         dt = dts[n]
         theta0 = get_theta(h0,soil_carac)
         # Picard iteration 
@@ -351,7 +352,7 @@ def run_varsat(L, T, dz, dts, h_init, bc, q, soil_carac, PICmax = 1000, CRIT_CON
                                 K     = get_K(h,soil_carac)
                                 Kp    = get_Kp(K)
                                 Infil = Kp[-1]*(((get_m1(I-1,Kp)*h1[-2]+get_b2(I-1,theta,soil_carac)*h0[-1] \
-                                    -get_b3(I-2,K)-get_b4(I-1,theta0,theta))/(get_m3(I-1,Kp)*dz))-1)
+                                    -get_b3(I-2,Kp)-get_b4(I-1,theta0,theta))/(get_m3(I-1,Kp)*dz))-1)
                                 RO[n] = bc['top'][1][n]-Infil[0,0]
                                 INF[n]=Infil[0,0]
                                 break
