@@ -265,7 +265,7 @@ soil_carac = {'Ksat':1e-4, 'Ss':0, 'eta':0.368, 'theta_r' : 0.102, 'theta_s' : 0
 
 T = 3600. # total simulation duration [s] 
 L = 0.7 # model length [m]
-dt = 10 # time step [s]
+dt = 1 # time step [s]
 dz = 0.01 # mesh cell size [m]
 
 N = int(round(T/dt)) # number of time steps
@@ -301,4 +301,169 @@ import csv
 with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/compHydrus/test.csv', 'wb') as test_file:
     AA = csv.writer(test_file, delimiter=',')
     AA.writerow(np.asarray(S)[:,N]) 
+
+
+
+
+
+
+
+# Check all values below
+
+# Soil characteristics 
+soil_carac = {'Ksat':1e-4, 'Ss':0, 'eta':0.368, 'theta_r' : 0.102, 'theta_s' : 0.368, 'n':2, 'alpha':3.35, 'FC1':0.2, 'FC2':0.25}
+
+# time and space discretization
+
+T = 88. # total simulation duration [s] 
+L = 0.7 # model length [m]
+dt = 1. # time step [s]
+dz = 0.01 # mesh cell size [m]
+
+N = int(round(T/dt)) # number of time steps
+I = int(round(L/dz)) # number of cells
+
+#Root Information
+LR=0.5
+type='distribution'
+#get Root Distribution
+z = np.linspace(0,L,I)
+RD = get_RD(L, I, LR, z, dz, type) 
+
+
+# boundary conditions
+h_bot=-0.97
+#h_bot = -0.00001/3600
+h_top = -0.001/3600
+bc = {'top':['fixed_flow',[h_top]*N],'bot':['free_drainage']}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_flow',[h_bot]*N]}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_head',[h_bot]*N]}
+
+# source term
+q = 0
+
+# initial condition
+h_init = np.array([-0.97]*I)
+
+# --------------------- Simulation run --------------------------
+t, z, S, INF, RO = run_varsat(L, T, dz, dt, h_init, bc, q, soil_carac)
+
+
+
+
+#plt.plot(np.asarray(S)[:,N],z)
+plt.plot(100.*np.asarray(S)[:,N],100.*z)
+
+
+import csv
+with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/compHydrus/test.csv', 'wb') as test_file:
+    AA = csv.writer(test_file, delimiter=',')
+    AA.writerow(100.*np.asarray(S)[:,N]) 
+
+
+
+
+
+soil_carac = {'Ksat':1e-2, 'Ss':0, 'eta':0.368, 'theta_r' : 0.102, 'theta_s' : 0.368, 'n':2, 'alpha':0.0335, 'FC1':0.2, 'FC2':0.25}
+
+# time and space discretization
+
+T = 3600. # total simulation duration [s] 
+L = 70 # model length [cm]
+dt = 1 # time step [s]
+dz = 1 # mesh cell size [cm]
+
+N = int(round(T/dt)) # number of time steps
+I = int(round(L/dz)) # number of cells
+
+#Root Information
+LR=0.5
+type='distribution'
+#get Root Distribution
+z = np.linspace(0,L,I)
+RD = get_RD(L, I, LR, z, dz, type) 
+
+
+# boundary conditions
+h_bot = -0.001/3600
+h_top = -0.1/3600
+bc = {'top':['fixed_flow',[h_top]*N],'bot':['free_drainage']}
+
+# source term
+q = 0
+
+# initial condition
+h_init = np.array([-97.]*I)
+
+# --------------------- Simulation run --------------------------
+t, z, S, INF, RO = run_varsat(L, T, dz, dt, h_init, bc, q, soil_carac)
+
+
+
+
+plt.plot(np.asarray(S)[:,N],z)
+
+
+import csv
+with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/compHydrus/test.csv', 'wb') as test_file:
+    AA = csv.writer(test_file, delimiter=',')
+    AA.writerow(np.asarray(S)[:,N]) 
+
+
+
+
+
+
+
+# Soil characteristics 
+soil_carac = {'Ksat':1e-4, 'Ss':0, 'eta':0.368, 'theta_r' : 0.102, 'theta_s' : 0.368, 'n':2, 'alpha':3.35, 'FC1':0.2, 'FC2':0.25}
+
+# time and space discretization
+
+T = 3600. # total simulation duration [s] 
+timestep=np.array([0.,600.,1200.,1800.,2400.,3000.])
+tstep=1.
+L = 0.70 # model length [m]
+#dt = 60 # time step [s]
+dz = 0.01 # mesh cell size [m]
+I = int(round(L/dz)+1) # number of cells
+
+#Root Information
+LR=0.5
+type='distribution'
+#get Root Distribution
+z = np.linspace(0,L,I)
+RD = get_RD(L, I, LR, z, dz, type) 
+
+
+# boundary conditions
+h_bot=-0.97
+#h_bot = -0.00001/3600
+h_top = -0.001/3600
+bc = {'time':timestep,'top':['fixed_flow',[h_top]*len(timestep)],'bot':['free_drainage']}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_flow',[h_bot]*N]}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_head',[h_bot]*N]}
+
+# source term
+q = np.array([0,0,0,0,0,0])
+
+# initial condition
+h_init = np.array([-0.97]*I)
+
+# --------------------- Simulation run --------------------------
+t, z, S, INF, RO, Theta = run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac)
+
+
+
+
+#plt.plot(np.asarray(S)[:,N],z)
+plt.plot(100.*np.asarray(S)[:,-1],100.*z)
+
+
+import csv
+with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/compHydrus/test.csv', 'wb') as test_file:
+    AA = csv.writer(test_file, delimiter=',')
+    AA.writerow(100.*np.asarray(S)[:,(len(t)-1)]) 
+
+
 
