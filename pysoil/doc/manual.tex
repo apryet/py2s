@@ -13,8 +13,8 @@
 \usepackage[colorlinks,citecolor=blue]{hyperref}
 \usepackage{booktabs}%for nice tabs
 \usepackage[small,bf]{caption} %for little font caption
-\usepackage[utf8]{inputenc}
-\usepackage[english,french]{babel}
+%\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
 \usepackage{arydshln}
 \usepackage{natbib} % for Bibtek
 \bibliographystyle{agu}
@@ -185,25 +185,34 @@ Where $h_0$ is pressure head at a virtual node out of the system. In these condi
     (m_1 + m_2) h_1^{n+1,m+1} + m_3 h_2^{n+1,m+1} = - b_1 h_1^{n+1,m} - b_2 h_1^n + b_3 + b_4
 \end{equation}
 
+\section{Flux calculation}
+The flux for each node is calculated  when the flow equation is solved at each time. We used the discretized form of the Darcy's Law (eq. \ref{eq:bc_qz}) for all nodes except for the node at the top of the soil profile. At the top node, we solved $q_{top}$ for the mass balance equation and Darcy's Law equation incorporated in eq. \ref{eq:bc_qz_lin_system_top}, as it seems a more stable and mass-conservative solution \citep{Hydrus1d}. Then the node flux is calculated as follows:
+\begin{align} \label{eq:flux}
+	q_0 &=-K_{1/2}\left(\frac{h_1-h_0}{dz}+1 \right) \nonumber \\
+	q_i &=\frac{-K_{i+1/2}\left(\frac{h_{i+1}-h_i}{dz}+1 \right)-K_{i-1/2}\left(\frac{h_{i}-h_{i-1}}{dz}+1 \right)}{2} \\
+	q_I &=-K_{I-1/2}\left(\frac{h_{I}-h_{I-1}}{dz}+1 \right)-\frac{dz}{2}\left(\frac{\theta_I^{n+1}-\theta_I^{n}}{dt}+S_p \right) \nonumber
+\end{align}
+
+
+
 \section{Runoff estimation}
 When the rainfall rate exceeds the soil infiltration capacity, a pounding condition occurs at the top of a plane terrain. In time, the pounded water will infiltrate to the soil. Contrary, on sloping terrains the pounding condition is negligable while water is loss as runoff. Following \cite{Herradaetal2014}, the pounding condition is reached when the upper soil surface saturates.
 A transient \emph{fixed flow} is prescribed at the upper boundary \citep{Herradaetal2014}:
  \begin{equation} \label{eq:run_pres_inf}
- 	In_{n} \equiv q(I,n) \equiv q_{rainfall} \equiv q_{top}
+ 	In \equiv q(I,n) \equiv q_{rainfall} \equiv q_{top}
 \end{equation}
-where $Inf_n$ is the infiltration rate.
-According to \cite{Herradaetal2014}, this condition applies when $\theta(I,n)<\theta_s$, if $\theta(I,n)$ reaches saturation, the boundary condition in Eq. \ref{eq:run_pres_inf} is replaced by $\theta(I,n)=\theta_s$.
-In our case, as we use the mixed form of the Richard's equation, our boundary conditions are different and the system resolution complex. Following the approach of \cite{Herradaetal2014}, we use the saturation condition from the pressure head $h$ to modify the upper boundary condition. When $h_I^{n+1}<0$, the upper boundary condition is the Eq. \ref{eq:bc_qz_lin_system_top}. In the case where $h_I^{n+1}\geq0$, the fixed flux upper boundary condition switches to a fixed head condition (Eq. \ref{eq:bc_fixed_top}), where $h_{top}^{n+1}=0$. On this scenario, the linear system is resolved again with the new conditions to obtain $h^{n+1}$.
-If we solve the Eq. \ref{eq:bc_qz_lin_system_top} for $q_{top}$ using $h_I^{n+1,m}=h_I^{n+1,m+1}=0$ (a valid assumption after $h_I^{n+1}$ is already known), Eq. \ref{eq:bc_qz_lin_system_top} yields:
-\begin{equation} \label{eq:run_pres_inf}
- 	In=q_{top}=K\left[\frac{\left( m_1h_{I-1}^{n+1}+b_2h_{I-1}^n-b_3-b_4\right) }{\left( m_3dz\right) }-1 \right] 
-\end{equation}
-where $h_{I-1}$ is obtained from the solution of the linear system with the new conditions.
-Finally, surface runoff is calculated as \citep{Herradaetal2014}:
+where $In$ is the infiltration rate.
+According to \cite{Herradaetal2014}, this condition applies when $\theta(I,n)<\theta_s$, if $\theta(I,n)$ reaches saturation, $\theta(I,n)=\theta_s$.
+In our case, as we use the mixed form of the Richard's equation, our boundary conditions are different and the system resolution complex. Following the approach of \cite{Herradaetal2014}, we use the saturation condition from the pressure head $h$ to modify the upper boundary condition. When $h_I^{n+1}<0$, the upper boundary condition is the Eq. \ref{eq:bc_qz_lin_system_top}. In the case where $h_I^{n+1}\geq0$, the fixed flux upper boundary condition switches to a fixed head condition (Eq. \ref{eq:bc_fixed_top}), where $h_{top}^{n+1}=0$. On this scenario, the linear system is resolved again with the new conditions to obtain $h^{n+1}$. The infiltration rate is solved using eq. \ref{eq:flux} for the top node, and surface runoff is calculated as \citep{Herradaetal2014}:
+%If we solve the Eq. \ref{eq:bc_qz_lin_system_top} for $q_{top}$ using $h_I^{n+1,m}=h_I^{n+1,m+1}=0$ (a valid assumption after $h_I^{n+1}$ is already known), Eq. \ref{eq:bc_qz_lin_system_top} yields:
+%\begin{equation} \label{eq:run_pres_inf}
+% 	In=q_{top}=K\left[\frac{\left( m_1h_{I-1}^{n+1}+b_2h_{I-1}^n-b_3-b_4\right) }{\left( m_3dz\right) }-1 \right] 
+%\end{equation}
+%here $h_{I-1}$ is obtained from the solution of the linear system with the new conditions.
+%Finally, surface runoff is calculated as \citep{Herradaetal2014}:
 \begin{equation} \label{eq:run_run}
     q_{runoff}=q_{rainfall}-In
 \end{equation}
-
 
 \section{Root water uptake and actual transpiration}
 Root water uptake from the soil is used by the plants for transpiration purposes. Total potential transpiration is calculated independently and it is redistributed over the soil profile as follows: 
@@ -249,11 +258,11 @@ where $\theta_{wp}$ is the water content of the soil unit at the \emph{wilting p
     \theta_{RWC}=\rho(\theta_{FC}-\theta_{WP})
 \end{equation}
 where $\theta_{FC}$ is the water content of the soil unit at the \emph{field capacity}, and $\rho$ is the average fraction of the available extracted water content of the soil unit that can be deplected before moisture stress, and its usually $0.5$ for many crops.
-Finally the actual transpiration rate $T_p$ $\mathrm{[LT^{-1}]}$ is calculated with the following equation:
+Finally the actual transpiration rate $T_a$ $\mathrm{[LT^{-1}]}$ is calculated with the following equation:
 \begin{equation} \label{eq:rwu_act_trans}
-    T_p=\sum\limits_{i=1}^{I}\alpha(\theta)b(z)T_p
+    T_a=\sum\limits_{i=1}^{I}\alpha(\theta)b(z)T_p
 \end{equation}
-Note that $T_p$ in Eq. \ref{eq:rwu_act_trans} do not consider the effect of osmotic stress by the soil salinity nor the compensation by the root adaptability to increase the uptake from other parts when moisture stress occurs. 
+Note that $T_a$ in Eq. \ref{eq:rwu_act_trans} do not consider the effect of osmotic stress by the soil salinity nor the compensation by the root adaptability to increase the uptake from other parts when moisture stress occurs. 
 
 \section{Time Step Optimization}
 The \emph{time discretization} is associated to the the input time data related to the boundary conditions and the source term, and to the numerical solution. The \emph{time steps} are variable and are calculated automatically by the program in order to reduce the computational time and induce stability to the calculations.
@@ -271,6 +280,16 @@ We used the same approach used by \cite{Hydrus1d}. The first time level is the p
   \end{cases}
 \end{equation}
 where, $M$ is the number of iteration required to reach covergence at a particular time level and $M_{max}$ is the prescribed maximum iteration number. Eventhough $\Delta t$ is calculated using Eq. \ref{eq:time_opt}, it can be modified in order to coincide with the prescribed time levels in the input data, and to be in the range $[t_{min},t_{max}]$, where $t_{min}$ and $t_{max}$ are prescribed values.
+\section{Water balance}
+The water balance is calculated for the whole flow region at prescribed time levels.The balance assess the actual water volume and the input flows as infiltration ($In$) and the output flows as percolation ($Pe$), transpiration ($Ta$) and runoff ($Ro$), presenting the total cummulated value of each variable at the time interval.  The water volume is calculated usign:
+\begin{equation} \label{eq:wb_vol}
+    V_t=\sum\limits_{i=1}^{I-1}\frac{\theta_{i+1}+\theta_i}{2}*dz
+\end{equation}
+The absolute and relative error in the water balance are calculated as follows:
+\begin{align} \label{eq:wb_er}
+    \varepsilon_{abs} &=\left(V_{t_1}-V_{t_2}\right)-\left(In-Pe-Ro-Ta\right) \nonumber \\
+    \varepsilon_{rel} &=\frac{\varepsilon_{abs}*100}{\left(V_{t_1}-V_{t_2}\right)}
+\end{align}
 
 \bibliography{biblio}
 
