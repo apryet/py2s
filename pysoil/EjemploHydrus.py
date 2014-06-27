@@ -520,3 +520,61 @@ TimeLevel=np.array([0.,3600.])
 
 mass_balance(TimeLevel,tt,INF,PER,TA,RO,VOL)
 
+
+
+##Version 3
+#Ejemplo con etp
+# Soil characteristics 
+soil_carac = {'Ksat':1e-4, 'Ss':0, 'eta':0.368, 'theta_r' : 0.102, 'theta_s' : 0.368, 'n':2, 'alpha':3.35, 'FC1':0.2, 'FC2':0.36}
+
+# time and space discretization
+
+T = 3600. # total simulation duration [s] 
+timestep=np.array([0.,600.,1200.,1800.,2400.,3000.])
+tstep=60.
+L = 0.70 # model length [m]
+#dt = 60 # time step [s]
+dz = 0.01 # mesh cell size [m]
+I = int(round(L/dz)+1) # number of cells
+
+#Root Information
+LR=0.7
+type='homogeneous'
+#get Root Distribution
+z = np.linspace(0,L,I)
+RD = get_RD(L, I, LR, z, dz, type) 
+
+
+# boundary conditions
+#h_bot=-0.5
+#h_bot = -0.00001/3600
+h_top = -0.001/3600
+bc = {'time':timestep,'top':['fixed_flow',[h_top]*len(timestep)],'bot':['free_drainage']}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_flow',[h_bot]*N]}
+#bc = {'top':['fixed_flow',[h_top]*N],'bot':['fixed_head',[h_bot]*N]}
+
+# source term
+q = [0.0005/3600]*len(timestep)
+#q = [0.]*len(timestep)
+
+# initial condition
+h_init = np.array([-0.5]*I)
+
+# --------------------- Simulation run --------------------------
+t, tt, z, S, Theta, Ka, Flow, INF, RO, PER, TA, VOL = run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac)
+
+
+
+
+#plt.plot(np.asarray(S)[:,N],z)
+plt.plot(100.*np.asarray(S)[:,-1],100.*z)
+
+TimeLevel=np.array([0.,3600.])
+
+mass_balance(TimeLevel,tt,INF,PER,TA,RO,VOL)
+
+
+
+
+
+

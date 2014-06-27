@@ -132,10 +132,10 @@ def get_RD(L, I, LR, z, dz, type):    #type can be homogeneous or follow Hoffman
     RD=np.zeros(I)
     if type =='homogeneous':
         for i in range(I):
-            if z[i] <= (L-LR):
+            if z[i] < (L-LR):
                 RD[i]= 0
             else:
-                RD[i]=1
+                RD[i]=1*I/(I-1)
     elif type == 'distribution':
         for i in range(I):
             if z[i] > (L-0.2*LR):
@@ -187,25 +187,25 @@ def get_b4(i,theta0,theta):
     return( (theta[i] - theta0[i] )/dt )
 
 #build Potential Water Uptake Distribution
-def w_uptake(theta0, RD, q, soil_carac):  #from Feddes et al., 1978 
+def w_uptake(theta0, RD, q, soil_carac, dz):  #from Feddes et al., 1978 
     WU= np.zeros(I)
     for i in range(I):
         if theta0[i]>=soil_carac['FC2']:
             red=(soil_carac['theta_s']-theta0[i])/(soil_carac['theta_s']-soil_carac['FC2'])
-        elif theta0[i]>=soil_carac['FC2']:
+        elif theta0[i]>=soil_carac['FC1']:
             red=1
         elif theta0[i]>=soil_carac['theta_r']:
-            red=(-soil_carac['theta_r']+theta0[i])/(-soil_carac['theta_r']+soil_carac['FC2'])
+            red=(-soil_carac['theta_r']+theta0[i])/(-soil_carac['theta_r']+soil_carac['FC1'])
         elif theta0[i]<soil_carac['theta_r']:
             red=0
-        else:
-            WU[i]=red*RD[i]*q[ww]*I/(I-1)
+        WU[i]=red*RD[i]*q*I/((I-1)*dz)
     return(WU)
 
 #build Flux             #Follow Darcy Law and mass conservancy equation from Celia, as used in Hydrus
 def get_flux(Kp,h,dz,theta,theta0,dts,WU):
     Fl = np.zeros(h.size)
-    Fl[0] = -Kp[0]*((h[1]-h[0])/dz+1)
+    #Fl[0] = -Kp[0]*((h[1]-h[0])/dz+1)
+    Fl[0] = -Kp[1]*((h[1]-h[0])/dz+1)-dz/2*((theta[0]-theta0[0])/dts+WU[0]) 
     Fl[-1] = -Kp[-2]*((h[-1]-h[-2])/dz+1)-dz/2*((theta[-1]-theta0[-1])/dts+WU[-1])
     for i in range(1,(h.size-1)): 
         Fl[i]=(-Kp[i+1]*((h[i+1]-h[i])/dz+1)-Kp[i]*((h[i]-h[i-1])/dz+1))/2
@@ -226,7 +226,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, ww, bcff):
     C     = get_C(h,soil_carac)
     K     = get_K(h,soil_carac)
     Kp    = get_Kp(K)
-    WU    = w_uptake(theta0, RD, q, soil_carac)
+    WU    = w_uptake(theta0, RD, q[ww], soil_carac,dz)
     M     = np.zeros((h.size,h.size))
     B     = np.zeros((h.size,))
     # fill matrix M and forcing vector B
@@ -275,24 +275,22 @@ def build_system(h0,h,theta0, bc, q, soil_carac, ww, bcff):
         #Change the values... get_b3 not sure what will result
     if bc['bot'][0] == 'fixed_flow':
         M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
-        B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + (K[0]-K[1])/dz + get_b4(0,theta0,theta) + WU[0] - get_m1(0,Kp)*dz*(bc['bot'][1][ww]/Kp[1] +1)
+        M[0,0] = -get_b1(0,C)/2.-get_m3(0,Kp)
+        B[0] = - get_b1(0,C)*h[0]/2. + get_b4(0,theta0,theta)/2. -Kp[1]/dz +WU[0]/2.- (bc['bot'][1][ww])/dz 
         #Change the values... get_b3 not sure what will result
 
-    # free drainage at the bottom
-    #if bc['bot'][0] == 'free_drainage':
-    #M[0,1] = get_m1(0,Kp)
-    #M[0,0] = get_m2(0,Kp,C,theta) + get_m3(0,Kp)
-    #B[0] = - get_b1(0,C)*h[0] - get_b2(I-1,theta,soil_carac)*h0[0] \
-        #+ get_b3(I-2,K) + get_b4(I-1,theta0,theta) + q[0,n]*dt/dz 
-
-   # free drainage at the bottom
+       # free drainage at the bottom
     if bc['bot'][0] == 'free_drainage':
         M[0,1] = get_m3(0,Kp)
-        M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
-        B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
-        + (K[0]-K[1])/dz + get_b4(0,theta0,theta) + WU[0]
+        M[0,0] = -get_b1(0,C)/2.-get_m3(0,Kp)
+        B[0] = - get_b1(0,C)*h[0]/2. + get_b4(0,theta0,theta)/2. -Kp[1]/dz +WU[0]/2.- (-K[0])/dz 
+
+   # free drainage at the bottom
+    #if bc['bot'][0] == 'free_drainage':
+    #    M[0,1] = get_m3(0,Kp)
+    #    M[0,0] = get_m2(0,Kp,C,theta) + get_m1(0,Kp)
+    #    B[0] = - get_b1(0,C)*h[0] - get_b2(0,theta,soil_carac)*h0[0] \
+    #    + (K[0]-K[1])/dz + get_b4(0,theta0,theta) + WU[0]
      
     # return M and B
     return(np.mat(M), np.transpose(np.mat(B)))
@@ -430,8 +428,8 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
         C     = get_C(h,soil_carac)
         K     = get_K(h,soil_carac)
         Kp    = get_Kp(K)
-        WU    = w_uptake(theta0, RD, q, soil_carac)
-        Ta    = get_SUM(WU,dz,I)*dts+Ta
+        WU    = w_uptake(theta0, RD, q[ww], soil_carac, dz)
+        Ta    = get_SUM(WU,dz,I)*dts*dz+Ta
         Flux  = get_flux(Kp,h,dz,theta,theta0,dts,WU)
         Per = Flux[0]*dts+Per
         if h[-1]>=0.:
@@ -510,6 +508,7 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
 
 ##Mass Balance
 
+
 def mass_balance(TimeLevel,t,INF,PER,TA,RO,VOL):
     if TimeLevel[0] not in t[:]:
         print('ERROR: Time levels are not correct. Choose the prescribed values in vector "t" ')
@@ -528,7 +527,7 @@ def mass_balance(TimeLevel,t,INF,PER,TA,RO,VOL):
     PERcom=sum(PER[a+1:b+1])
     TAcom=sum(TA[a+1:b+1])
     ROcom=sum(RO[a+1:b+1])
-    Erabs=VOL[b]-VOL[a]+(INFcom-PERcom-ROcom-TAcom)
+    Erabs=VOL[b]-VOL[a]-(-INFcom+PERcom+ROcom-TAcom)
     Errel=abs(Erabs)*100/abs(VOL[b]-VOL[a])
     if Errel>0.1:
         warning='Attention. Error too high.'
@@ -543,23 +542,23 @@ def mass_balance(TimeLevel,t,INF,PER,TA,RO,VOL):
     print('Final volume:    ' + str(VOL[b]) + '  [L]')
     print('______')
     print('')
-    print('Total infiltration:          ' + str(INFcom) + '  [L]')
-    print('Total percolation:           ' + str(PERcom) + '  [L]')
+    print('Total infiltration:          ' + str(-INFcom) + '  [L]')
+    print('Total percolation:           ' + str(-PERcom) + '  [L]')
     print('Total actual transpiration:  ' + str(TAcom) + '  [L]')
-    print('Total runoff:                ' + str(ROcom) + '  [L]')
+    print('Total runoff:                ' + str(-ROcom) + '  [L]')
     print('______')
     print('')
-    print('Total input:     ' + str(INFcom) + '  [L]')
-    print('Total output:    ' + str((PERcom+ROcom+TAcom)) + '  [L]')
+    print('Total input:     ' + str(-INFcom) + '  [L]')
+    print('Total output:    ' + str(-(PERcom+ROcom-TAcom)) + '  [L]')
     print('______')
     print('')
     print('Input')
     print('Relative Rainfall: ' + str(INFcom*100/INFcom) + '  [%]')
     print('')
     print('Output')
-    print('Relative percolation:            ' + str(PERcom*100/(PERcom+ROcom+TAcom)) + '  [%]')
-    print('Relative actual transpiration:   ' + str(TAcom*100/(PERcom+ROcom+TAcom)) + '  [%]')
-    print('Relative runoff:                 ' + str(ROcom*100/(PERcom+ROcom+TAcom)) + '  [%]')
+    print('Relative percolation:            ' + str(PERcom*100/(PERcom+ROcom-TAcom)) + '  [%]')
+    print('Relative actual transpiration:   ' + str(-TAcom*100/(PERcom+ROcom-TAcom)) + '  [%]')
+    print('Relative runoff:                 ' + str(ROcom*100/(PERcom+ROcom-TAcom)) + '  [%]')
     print('______')
     print('')
     print('Absolute error: ' + str(Erabs) + '  [L]')
