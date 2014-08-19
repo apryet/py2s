@@ -72,7 +72,7 @@ Spatial derivation is obtained with a central differences scheme as follows :
 \begin{align} \label{eq:space_discret}
       \frac{\partial}{\partial z} \left( K \frac{\partial h}{\partial z} \right) + \frac{\partial K}{\partial z} & \approx  \frac{1}{dz} \left\{ \left(\frac{K_i^{n+1,m}+K_{i+1}^{n+1,m}}{2}\right) \left(\frac{h_{i+1}^{n+1,m+1} - h_i^{n+1,m+1}}{dz} \right) \right. \nonumber \\
       &  - \left. \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2}\right) \left(\frac{h_{i}^{n+1,m+1} - h_{i-1}^{n+1,m+1}}{dz} \right)  \right\} \nonumber  \\
-      & + \frac{1}{dz} \left( \left(\frac{K_i^{n+1,m}-K_{i+1}^{n+1,m}}{2}\right) - \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2}  \right) \right)  
+      & + \frac{1}{dz} \left( \left(\frac{K_i^{n+1,m}+K_{i+1}^{n+1,m}}{2}\right) - \left(\frac{K_i^{n+1,m}+K_{i-1}^{n+1,m}}{2}  \right) \right)  
 \end{align}
 where $n$ denotes the $n$th discrete time level, when the solution is known, $dt$ is the time step, $K_i$ is the value of hydraulic conductivity at the $i$th node and $h_i$ the value of pressure head at the $i$th node. The current and previous Picard iteration are denoted as $m+1$ and $m$, respectively.
 
