@@ -1,38 +1,42 @@
-
-##Read clim data...
-
 import csv
-#with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/Interception/Data/clim_data2.csv', "rU") as csvfile:
-with open('clim_data2.csv', "rU") as csvfile:
-    csv_file = csv.reader(csvfile, delimiter=',')
-    # eliminate blank rows if they exist
-    rows = [row for row in csv_file if row]
-    taille = len(rows)
-    headings = rows[0] # get headings
+import sys
+from os.path import expanduser
+home = expanduser("~")
+import numpy as np
+
+sys.path.append( home +'/Programmes/py2s/pysurf/')
+
+from interp_model import *
+
+# -------------------------------------------------------------------------------------
+# --- Import clim data  --------------------------------------------------
+# -------------------------------------------------------------------------------------
 
 
-#sup=20544
-sup0=1	#inicio en la garua
-#sup0=20545	#inicio en invierno
-#sup=20544	#termina en garua
-sup=taille-1	#termina en invierno
-Rain_clim=np.zeros(sup)
-Thfall_clim=np.zeros(sup)
-Evap_clim=np.zeros(sup)
-Tran_clim=np.zeros(sup)
-Season_clim=np.zeros(sup)
-Fogpr_clim=np.zeros(sup)
+with open('./clim_data.csv', "rU") as csvfile:
+    csv_reader = csv.DictReader(csvfile, delimiter=',', dialect = 'excel')
+    clim_data_raw = {}
+    for row in csv_reader :
+	for column, value in row.iteritems() :
+	    clim_data_raw.setdefault(column, []).append(value)
 
-for i in range(sup0,int(sup)):
-	Rain_clim[i-1]=float(rows[i][7])
-	Thfall_clim[i-1]=float(rows[i][9])
-	Evap_clim[i-1]=float(rows[i][10])
-	Tran_clim[i-1]=float(rows[i][11])
-	Season_clim[i-1]=float(rows[i][12])
-	Fogpr_clim[i-1]=float(rows[i][13])
+#import pandas
+#data = pandas.read_csv(r'..\data\data.csv')
+
+# -------------------------------------------------------------------------------------
+# --- Identify climate variables 
+# -------------------------------------------------------------------------------------
 
 ##Climate Data
-clim_data = {'Rain':Rain_clim, 'Thfall': Thfall_clim, 'Evap':Evap_clim, 'Tran':Tran_clim}
+clim_data = {'Rain':np.array(clim_data_raw['Rain_mm_Tot'],dtype=float), \
+    'Thfall': np.array(clim_data_raw['Thfall_mm'],dtype=float),
+    'Evap_pot': np.array(clim_data_raw['E_mm_Tot'],dtype=float),
+    'Tran_pot':np.array(clim_data_raw['T_mm_Tot'],dtype=float)
+    }
+
+# -------------------------------------------------------------------------------------
+# --- Set canopy characteristics 
+# -------------------------------------------------------------------------------------
 
 ##Canopy Data
 p_clim=0.1
@@ -42,43 +46,22 @@ b_clim=8.83
 #Ds_clim=0.0000000223
 #b_clim=7.71
 
+
 canopy_carac = {'p':p_clim, 'S':S_clim, 'Ds':Ds_clim, 'b':b_clim}
+# -------------------------------------------------------------------------------------
+# --- Run model  --------------------------------------------------
+# -------------------------------------------------------------------------------------
 
-int_model=interception_model(clim_data,canopy_carac, drain_func=2)
+int_model=interception_model(clim_data,canopy_carac)
 
+# -------------------------------------------------------------------------------------
+# --- Write results  --------------------------------------------------
+# -------------------------------------------------------------------------------------
 
-#for i in range(0, len(int_model['TF'])):
-#    if int_model['C'][i]>=0.1*canopy_carac['S']:
-#        clim_data['Tran'][i]=float(0)
-
-
-#for i in range(0, len(int_model['TF'])):
-#    if int_model['C'][i]>=canopy_carac['S']:
-#        clim_data['Tran'][i]=float(0)
-#    elif int_model['C'][i]>=0.05 and int_model['C'][i]<canopy_carac['S']:
-#        clim_data['Tran'][i]=clim_data['Tran'][i]*int_model['C'][i]/canopy_carac['S']
-        
-        
-
-#for i in range(0,len(int_model['TF'])):
-#	if int_model['C'][i]>=0.03:
-#		clim_data['Tran'][i]=float(0)
-
-#with open('/Users/redhotkenny/Documents/Documentos/Doctorado/SoilModel/Interception/Data/output.dat', 'w') as outputfile :
-with open('output.dat', 'w') as outputfile :
-	for i in range(0,len(int_model['TF'])):
-		outputfile.write( str(round(clim_data['Rain'][i],5)) + ',' + str(round(clim_data['Thfall'][i],5)) + ',' +  str(round(int_model['E'][i],5)) + ',' + str(round(clim_data['Tran'][i],5)) + ','  + str(round(int_model['C'][i],5)) + ',' + str(round(int_model['D'][i],5)) + ',' + str(round(int_model['TF'][i],5)) + ',' + str(round(int_model['CWI'][i],5))  + '\n' )
-
-
-
-#with open('output.dat', 'w') as outputfile :
-#	for i in range(0,len(int_model['TF'])):
-#	    outputfile.write( str(round(int_model['TF'][i],5)) + '\n' )
-
-
-
-#with open('obs.dat', 'w') as outputfile :
-#	for i in range(0,len(clim_data['Thfall'])):
-#	    outputfile.write( str(clim_data['Thfall'][i]) + '\n' )
+with open('output.dat', 'wb') as outputfile : 
+    csvwriter = csv.DictWriter(outputfile, delimiter=',', lineterminator='\n', fieldnames=int_model.keys())
+    csvwriter.writeheader()
+    for i in range(len(int_model.values()[0])) :
+	csvwriter.writerow( { key:val for key,val in zip( int_model.keys(), [ val[i] for val in int_model.values() ] ) } )
 
 

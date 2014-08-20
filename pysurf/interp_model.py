@@ -7,17 +7,15 @@ import scipy as sp
 from time import *
 from math import *
 
-
-
-
 # -----------------------------------------------------------------------------
 # -- Drainage functions -------------------------------------------------------
 # -----------------------------------------------------------------------------
 
+# Drainage function by Rutter 1975 y Guevara-Escobar, 2007
 def drainage_func1(canopy_carac,cc):
     return(canopy_carac['Ds']*(cc)**canopy_carac['b'])
 
-
+# Drainage function by Pitmann 1989, Domingo 1998
 def drainage_func2(canopy_carac,cc):
     return(canopy_carac['Ds']*exp(canopy_carac['b']*(cc)))
 
@@ -42,7 +40,7 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 	# E, simulated canopy evaporation (i.e. interception)
 	# TF,simulated throughfall
 	# CWI, estimated cloud water interception
-	clim_model={ 'C':np.zeros(nobs), 'D':np.zeros(nobs), 'E':np.zeros(nobs), 'TF':np.zeros(nobs), 'CWI':np.zeros(nobs) }
+	clim_model={ 'C':np.zeros(nobs), 'D':np.zeros(nobs), 'E':np.zeros(nobs), 'T':np.zeros(nobs), 'TF':np.zeros(nobs), 'CWI':np.zeros(nobs) }
 	
 	# iterate over observations records
 	for i in range(1,nobs):
@@ -71,7 +69,7 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 				ee = clim_data['Evap_pot'][i]/float(nstep)*(1-canopy_carac['p'])
 				tt = 0
 
-			else: # otherwise, canopy evaporation proportional to canopy water content
+			else : # otherwise, canopy evaporation proportional to canopy water content
 				ee = clim_data['Evap_pot'][i]/float(nstep)*(1-canopy_carac['p'])*cc/canopy_carac['S']
 				tt = clim_data['Tran_pot'][i]/float(nstep)*(1-canopy_carac['p'])*(1 - cc/canopy_carac['S'])
 			
@@ -81,14 +79,10 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 			cc = cc - ee # remove evaporated water from canopy
 
 			# drainage estimation
-			if cc >= canopy_carac['S']: # 
-					if nstep == 1 :
-						dd = drainage_func(canopy_carac,cc) 
-					else:
-						dd = delta_t * drainage_func(canopy_carac,cc)
-			
+			if nstep == 1 :
+			    dd = drainage_func(canopy_carac,cc) 
 			else :
-				dd=0
+			    dd = delta_t * drainage_func(canopy_carac,cc)
 			
 			# update drainage
 			dd0=dd0+dd
@@ -115,7 +109,7 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 		clim_model['C'][i] = cc
 		clim_model['D'][i] = dd0
 		clim_model['E'][i] = ee0
-		clim_model['E'][i] = ee0
+		clim_model['T'][i] = tt0
 		clim_model['TF'][i] = tf
 		clim_model['CWI'][i] = cwi
 
