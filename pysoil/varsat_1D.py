@@ -201,7 +201,7 @@ def w_uptake(theta0, RD, q, soil_carac, dz):  #from Feddes et al., 1978
         WU[i]=red*RD[i]*q*I/((I-1)*dz)
     return(WU)
 
-#build Flux             #Follow Darcy Law and mass conservancy equation from Celia, as used in Hydrus
+#build Flux             #Follow Darcy Law and mass conservancy equation from Celia, as used in Hydrus p 112 del manual
 def get_flux(Kp,h,dz,theta,theta0,dts,WU):
     Fl = np.zeros(h.size)
     #Fl[0] = -Kp[0]*((h[1]-h[0])/dz+1)
@@ -221,6 +221,7 @@ def get_SUM(x,dz,I):
 
 # build system of equation
 def build_system(h0,h,theta0, bc, q, soil_carac, ww, bcff):
+    # bcff if TRUE, 
     # init vectors
     theta = get_theta(h,soil_carac)
     C     = get_C(h,soil_carac)
@@ -251,7 +252,7 @@ def build_system(h0,h,theta0, bc, q, soil_carac, ww, bcff):
     # fixed flow
     # top
     if bc['top'][0] == 'fixed_flow':
-            if bcff=='True':
+            if bcff=='True': # fixed pressure head 
                 M[-1,-1] = 1. 
                 M[-1,-2] = 0.  
                 B[-1]   = 0.
@@ -366,7 +367,7 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
     Theta = np.mat(np.zeros(shape=(I,1)))
     theta0 = get_theta(h0,soil_carac)
     Theta[:,0]=np.transpose(np.mat(theta0))
-    Ka = np.mat(np.zeros(shape=(I,1)))
+    Ka = np.mat(np.zeros(shape=(I,1))) # util para comparar con Hydrus
     K0 = get_K(h,soil_carac)
     Ka[:,0]=np.transpose(np.mat(K0))
     Flow = np.mat(np.zeros(shape=(I,1)))
@@ -428,13 +429,13 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
         C     = get_C(h,soil_carac)
         K     = get_K(h,soil_carac)
         Kp    = get_Kp(K)
-        WU    = w_uptake(theta0, RD, q[ww], soil_carac, dz)
-        Ta    = get_SUM(WU,dz,I)*dts*dz+Ta
-        Flux  = get_flux(Kp,h,dz,theta,theta0,dts,WU)
-        Per = Flux[0]*dts+Per
+        WU    = w_uptake(theta0, RD, q[ww], soil_carac, dz) # water update
+        Ta    = get_SUM(WU,dz,I)*dts*dz+Ta # cumulative transpiration
+        Flux  = get_flux(Kp,h,dz,theta,theta0,dts,WU)  # flux in each node 
+        Per = Flux[0]*dts+Per # cumulative percolation
         if h[-1]>=0.:
-            Infil = Flux[-1]*dts+Infil
-            Ro = Ro+(bc['top'][1][ww]-Flux[-1])*dts
+            Infil = Flux[-1]*dts+Infil  # infiltration at the top of the soil column
+            Ro = Ro+(bc['top'][1][ww]-Flux[-1])*dts # Runoff 
         else:
             Infil = bc['top'][1][ww]*dts+Infil
             Ro=Ro+0
@@ -446,13 +447,13 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
             Ka[:,-1] = np.transpose(np.mat(K))
             S = np.c_[S,np.zeros(I)]
             S[:,-1] = np.mat(h)
-            Flow = np.c_[Flow,np.zeros(I)]
+            Flow = np.c_[Flow,np.zeros(I)] # matrix, same as S
             Flow[:,-1] = np.transpose(np.mat(Flux))
-            TA = np.hstack((TA, Ta))
-            RO = np.hstack((RO, Ro))
-            INF = np.hstack((INF,Infil))
-            PER = np.hstack((PER, Per))
-            VOL = np.hstack((VOL, (get_SUM(theta,dz,I))*dz))
+            TA = np.hstack((TA, Ta)) # useful for mass balance 
+            RO = np.hstack((RO, Ro)) # idem
+            INF = np.hstack((INF,Infil)) # idem
+            PER = np.hstack((PER, Per)) # idem
+            VOL = np.hstack((VOL, (get_SUM(theta,dz,I))*dz)) # Volume of water in each cell for each 
             tt = np.hstack((tt,bc['time'][ww]))
             Ro=0.
             Infil=0.
@@ -460,8 +461,8 @@ def run_varsat(L, T, dz, tstep, h_init, bc, q, soil_carac, PICmax = 10, CRIT_CON
             Ta=0. 
 
 
-        if t[-1]==T:
-            tt[-1] = T
+        if t[-1]==T: #  if last time step is reached
+            tt[-1] = 
             break
         h0 = h
         if t[-1]==bc['time'][ww]:
