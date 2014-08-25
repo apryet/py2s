@@ -15,9 +15,17 @@ from math import *
 def drainage_func1(canopy_carac,cc):
     return(canopy_carac['Ds']*(cc)**canopy_carac['b'])
 
-# Drainage function by Pitmann 1989, Domingo 1998
+# Drainage function by Pitmann 1989, Domingo 1998 : PASTURE
 def drainage_func2(canopy_carac,cc):
     return(canopy_carac['Ds']*exp(canopy_carac['b']*(cc)))
+
+
+# Drainage function b  : FOREST
+def drainage_func3(canopy_carac,cc):
+    if cc > canopy_carac['S']:
+	return(canopy_carac['Ds']*exp(canopy_carac['b']*(cc-canopy_carac['S'])))
+    else : 
+	return(0)
 
 # -----------------------------------------------------------------------------
 # Interception model ----------------------------------------------------------
@@ -76,20 +84,30 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 			# update evaporation for current record 
 			ee0 = ee + ee0  
 			tt0 = tt + tt0  
-			cc = cc - ee # remove evaporated water from canopy
 
+			# remove evaporated water from canopy
+			cc = cc - ee 
+
+			# correct storage if it goes below 0
+			if cc < 0:
+			    ee = ee + cc
+			    cc = 0
+				
 			# drainage estimation
 			if nstep == 1 :
-			    dd = drainage_func(canopy_carac,cc) 
+			    dd = delta_t * drainage_func(canopy_carac,cc) 
 			else :
-			    dd = delta_t * drainage_func(canopy_carac,cc)
+			    dd = drainage_func(canopy_carac,cc)
 			
-			# update drainage
-			dd0=dd0+dd
+			# update total drainage
+			dd0 = dd0 + dd
 
-			# final canopy storage estimation #step1
-			cc = cc - dd # THERE MAY BE A PROBLEM OF MASS BALANCE HERE; DRAINAGE IS OVER-ESTIMATED WHEN IT CAUSES cc<0
+			# remove drained water from canopy
+			cc = cc - dd	
+			
+			# correct storage if it goes below 0
 			if cc < 0:
+				dd = dd + cc
 				cc = 0
 
 			# update canopy water content 
@@ -100,10 +118,9 @@ def interception_model(clim_data, canopy_carac, compute_cwi = False, delta_t = 9
 
 		# compute cloud water interception
 		if compute_cwi == True : 
-		    cwi = 0
-		    
-		else : 
 		    cwi = clim_data['Thfall'][i] - tf
+		else : 
+		    cwi = 0
 
 		# write clim_model data #step1
 		clim_model['C'][i] = cc
